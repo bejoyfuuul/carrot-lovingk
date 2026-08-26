@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "naver-blog-crawler"
+version = "0.1.0"
+description = "네이버 블로그 글을 마크다운·텍스트·JSON 으로 가져오는 도구"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.28",
+    "beautifulsoup4>=4.11",
+    "lxml>=4.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+naver-blog = "naver_blog_crawler.cli:main"
+
+[tool.setuptools]
+packages = ["naver_blog_crawler"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
