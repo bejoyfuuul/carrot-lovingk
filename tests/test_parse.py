@@ -115,3 +115,73 @@ def test_본문이_없는_페이지는_안내와_함께_실패한다():
     with pytest.raises(ParseError) as caught:
         parse("<html><body><p>안녕하세요</p></body></html>", SE_ONE)
     assert caught.value.hint
+
+
+# --- HTML 표현 --------------------------------------------------------------
+
+
+def test_새_에디터의_구조가_HTML에도_그대로_담긴다(se_one):
+    body = se_one.html
+    assert "<p>" in body
+    assert "<strong>" in body  # 굵게
+    assert "<blockquote>" in body  # 인용
+    assert "<figure>" in body and "<img" in body  # 사진
+    assert "<hr>" in body  # 구분선
+
+
+def test_구버전_에디터도_HTML을_만든다(legacy):
+    assert "<p>" in legacy.html
+    assert "<figure>" in legacy.html
+
+
+def test_네이버의_스타일과_클래스는_HTML에_따라오지_않는다(se_one):
+    # 원본에는 se-fs-, se-ff- 같은 클래스와 인라인 style 이 잔뜩 붙어 있습니다.
+    assert "se-fs-" not in se_one.html
+    assert "class=" not in se_one.html.replace('class="place"', "")
+    assert "style=" not in se_one.html
+
+
+def test_본문의_꺾쇠는_태그로_새지_않는다():
+    html = """
+    <div class="se-main-container">
+      <div class="se-component se-text">
+        <div class="se-module se-module-text">
+          <p class="se-text-paragraph">a &lt;b&gt; c &amp; d</p>
+        </div>
+      </div>
+    </div>
+    """
+    post = parse(html, SE_ONE)
+    assert "<p>a &lt;b&gt; c &amp; d</p>" in post.html
+    assert post.text == "a <b> c & d"
+
+
+def test_문단_안의_줄바꿈은_HTML에서_br_이_된다():
+    html = """
+    <div class="se-main-container">
+      <div class="se-component se-text">
+        <div class="se-module se-module-text">
+          <p class="se-text-paragraph">첫 줄<br>둘째 줄</p>
+        </div>
+      </div>
+    </div>
+    """
+    post = parse(html, SE_ONE)
+    assert "<p>첫 줄<br>둘째 줄</p>" in post.html
+    assert post.markdown == "첫 줄\n둘째 줄"
+
+
+def test_표는_HTML에서도_표로_남는다(se_one):
+    html = """
+    <div class="se-main-container">
+      <div class="se-component se-table">
+        <table><tbody>
+          <tr><td>이름</td><td>값</td></tr>
+          <tr><td>가</td><td>1</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    """
+    post = parse(html, SE_ONE)
+    assert "<table><thead><tr><th>이름</th><th>값</th></tr></thead>" in post.html
+    assert "<tbody><tr><td>가</td><td>1</td></tr></tbody></table>" in post.html

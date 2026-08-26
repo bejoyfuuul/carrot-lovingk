@@ -4,16 +4,21 @@
 
   * 스마트에디터 ONE (2018~, 현재 대부분): ``.se-main-container`` 안에
     ``.se-component`` 블록이 나열됩니다. 블록 종류마다 뜻이 달라서
-    문단/제목/인용/이미지/표/코드를 구분해 마크다운으로 옮길 수 있습니다.
+    문단/제목/인용/이미지/표/코드를 구분해 옮길 수 있습니다.
   * 구버전 에디터: ``#postViewArea`` 안에 평범한 HTML 이 들어 있습니다.
-    구조 정보가 거의 없어서 일반 HTML → 마크다운 변환으로 처리합니다.
+    구조 정보가 거의 없어서 문단 단위 변환으로 처리합니다.
 
 두 경우 모두 같은 Post 를 돌려줍니다.
+
+본문은 마크다운·순수 텍스트·HTML 세 가지로 동시에 만들어 둡니다.
+하나만 만들어 두고 나중에 서로 변환하면 표나 인용처럼 구조가 있는 것이
+깨지기 때문에, 원본 구조를 아는 이 자리에서 셋을 함께 만듭니다.
 """
 
 from __future__ import annotations
 
 import re
+from html import escape
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -49,6 +54,7 @@ def parse(html: str, ref: PostRef) -> Post:
     ]
     markdown = _join(block.markdown for block in blocks)
     text = _join(block.text for block in blocks)
+    body_html = "\n".join(block.html for block in blocks if block.html)
 
     if not markdown.strip() and not images:
         raise ParseError(f"본문이 비어 있습니다: {ref.canonical_url}")
@@ -64,6 +70,7 @@ def parse(html: str, ref: PostRef) -> Post:
         tags=_tags(soup),
         markdown=markdown,
         text=text,
+        html=body_html,
         images=images,
     )
 
@@ -74,11 +81,18 @@ def parse(html: str, ref: PostRef) -> Post:
 
 
 class _Block:
-    """마크다운 표현과 순수 텍스트 표현을 함께 들고 다니는 본문 조각."""
+    """본문 조각 하나를 세 가지 표현으로 함께 들고 다닙니다."""
 
-    def __init__(self, markdown: str, text: str = "", image: tuple | None = None):
+    def __init__(
+        self,
+        markdown: str,
+        text: str = "",
+        html: str = "",
+        image: tuple | None = None,
+    ):
         self.markdown = markdown
         self.text = text if text is not None else ""
+        self.html = html
         self.image = image
 
 
@@ -99,13 +113,15 @@ def _component_to_blocks(component: Tag) -> list[_Block]:
 
     if "se-sectionTitle" in kinds:
         title = _inline(component)
-        return [_Block(f"## {title}", _plain(component))] if title else []
+        if not title:
+            return []
+        return [_Block(f"## {title}", _plain(component), f"<h2>{_rich(component)}</h2>")]
 
     if "se-quotation" in kinds:
         return _quotation(component)
 
     if "se-horizontalLine" in kinds:
-        return [_Block("---", "")]
+        return [_Block("---", "", "<hr>")]
 
     if "se-image" in kinds or "se-imageStrip" in kinds:
         return _images(component)
@@ -115,7 +131,15 @@ def _component_to_blocks(component: Tag) -> list[_Block]:
 
     if "se-code" in kinds or "se-codeblock" in kinds:
         body = component.get_text("\n").strip("\n")
-        return [_Block(f"```\n{body}\n```", body)] if body.strip() else []
+        if not body.strip():
+            return []
+        return [
+            _Block(
+                f"```\n{body}\n```",
+                body,
+                f"<pre><code>{escape(body)}</code></pre>",
+            )
+        ]
 
     if "se-oglink" in kinds:
         return _oglink(component)
@@ -125,7 +149,15 @@ def _component_to_blocks(component: Tag) -> list[_Block]:
 
     if "se-placesMap" in kinds or "se-map" in kinds:
         label = _clean(component.get_text(" "))
-        return [_Block(f"> 📍 {label}", label)] if label else []
+        if not label:
+            return []
+        return [
+            _Block(
+                f"> 📍 {label}",
+                label,
+                f'<p class="place">📍 {escape(label)}</p>',
+            )
+        ]
 
     if "se-material" in kinds or "se-sticker" in kinds:
         return []
@@ -139,7 +171,9 @@ def _text_component(component: Tag) -> list[_Block]:
         for paragraph in module.find_all("p", class_="se-text-paragraph"):
             line = _inline(paragraph)
             if line:
-                blocks.append(_Block(line, _plain(paragraph)))
+                blocks.append(
+                    _Block(line, _plain(paragraph), f"<p>{_rich(paragraph)}</p>")
+                )
     return blocks
 
 
@@ -150,11 +184,13 @@ def _quotation(component: Tag) -> list[_Block]:
     if not lines:
         return []
     quoted = "\n".join(f"> {line}" for line in lines)
+    inner = "".join(f"<p>{_rich(p)}</p>" for p in paragraphs if _inline(p))
     cite = component.select_one(".se-cite")
     if cite is not None and (source := _clean(cite.get_text(" "))):
         quoted += f"\n> \n> — {source}"
         plain.append(f"— {source}")
-    return [_Block(quoted, "\n".join(plain))]
+        inner += f"<footer>— {escape(source)}</footer>"
+    return [_Block(quoted, "\n".join(plain), f"<blockquote>{inner}</blockquote>")]
 
 
 def _images(component: Tag) -> list[_Block]:
@@ -177,7 +213,9 @@ def _images(component: Tag) -> list[_Block]:
         markdown = f"![{label}]({url})"
         if caption:
             markdown += f"\n*{caption}*"
-        blocks.append(_Block(markdown, caption, image=(url, caption, alt)))
+        blocks.append(
+            _Block(markdown, caption, _figure(url, caption, alt), (url, caption, alt))
+        )
     return blocks
 
 
@@ -250,7 +288,12 @@ def _table(component: Tag) -> list[_Block]:
     lines = [_row(header), _row(["---"] * width)]
     lines += [_row(row) for row in body]
     plain = "\n".join(" | ".join(row) for row in rows)
-    return [_Block("\n".join(lines), plain)]
+
+    html = ["<table><thead>", _html_row(header, "th"), "</thead><tbody>"]
+    html += [_html_row(row, "td") for row in body]
+    html.append("</tbody></table>")
+
+    return [_Block("\n".join(lines), plain, "".join(html))]
 
 
 def _row(cells: list[str]) -> str:
@@ -258,25 +301,56 @@ def _row(cells: list[str]) -> str:
     return "| " + " | ".join(escaped) + " |"
 
 
+def _html_row(cells: list[str], tag: str) -> str:
+    body = "".join(
+        f"<{tag}>{escape(cell).replace(chr(10), '<br>')}</{tag}>" for cell in cells
+    )
+    return f"<tr>{body}</tr>"
+
+
+def _figure(url: str, caption: str, alt: str) -> str:
+    src = escape(url, quote=True)
+    figure = f'<figure><img src="{src}" alt="{escape(alt, quote=True)}" loading="lazy">'
+    if caption:
+        figure += f"<figcaption>{escape(caption)}</figcaption>"
+    return figure + "</figure>"
+
+
 def _oglink(component: Tag) -> list[_Block]:
     anchor = component.find("a", href=True)
     if anchor is None:
         return []
     title_tag = component.select_one(".se-oglink-title")
-    label = _clean(title_tag.get_text(" ")) if title_tag else anchor["href"]
-    return [_Block(f"[{label}]({anchor['href']})", f"{label} ({anchor['href']})")]
+    href = anchor["href"]
+    label = _clean(title_tag.get_text(" ")) if title_tag else href
+    return [
+        _Block(
+            f"[{label}]({href})",
+            f"{label} ({href})",
+            f'<p><a href="{escape(href, quote=True)}">{escape(label)}</a></p>',
+        )
+    ]
 
 
 def _embed(component: Tag) -> list[_Block]:
     for attribute in ("data-linkdata", "data-module"):
         if data := component.get(attribute):
             if match := re.search(r'"(?:src|url|link)"\s*:\s*"([^"]+)"', data):
-                url = match.group(1).replace("\\/", "/")
-                return [_Block(f"[동영상]({url})", url)]
+                return _video(match.group(1).replace("\\/", "/"))
     iframe = component.find("iframe")
     if iframe is not None and (src := iframe.get("src")):
-        return [_Block(f"[동영상]({src})", src)]
-    return [_Block("_(동영상)_", "(동영상)")]
+        return _video(src)
+    return [_Block("_(동영상)_", "(동영상)", "<p><em>(동영상)</em></p>")]
+
+
+def _video(url: str) -> list[_Block]:
+    return [
+        _Block(
+            f"[동영상]({url})",
+            url,
+            f'<p><a href="{escape(url, quote=True)}">동영상</a></p>',
+        )
+    ]
 
 
 # --------------------------------------------------------------------------
@@ -300,7 +374,7 @@ def _parse_legacy(container: Tag) -> list[_Block]:
                 blocks.extend(_legacy_image(node))
             continue
         if node.name == "hr":
-            blocks.append(_Block("---", ""))
+            blocks.append(_Block("---", "", "<hr>"))
             continue
         # 안에 또 문단이 있으면 그 자식이 처리하도록 넘깁니다.
         if node.find(["p", "div", "li", "blockquote"]) is not None:
@@ -308,8 +382,12 @@ def _parse_legacy(container: Tag) -> list[_Block]:
 
         line = _inline(node)
         if line:
-            markdown = f"> {line}" if node.name == "blockquote" else line
-            blocks.append(_Block(markdown, _plain(node)))
+            quote = node.name == "blockquote"
+            markdown = f"> {line}" if quote else line
+            tag = "blockquote" if quote else "p"
+            blocks.append(
+                _Block(markdown, _plain(node), f"<{tag}>{_rich(node)}</{tag}>")
+            )
         for img in node.find_all("img"):
             if id(img) in seen_images:
                 continue
@@ -346,7 +424,7 @@ def _legacy_image(img: Tag) -> list[_Block]:
     if not url or _is_decoration(url):
         return []
     alt = _clean(img.get("alt") or "")
-    return [_Block(f"![{alt}]({url})", alt, image=(url, "", alt))]
+    return [_Block(f"![{alt}]({url})", alt, _figure(url, "", alt), (url, "", alt))]
 
 
 #: 본문과 무관한 꾸밈 이미지(프로필 사진, 이모티콘, 스킨 등)의 주소 조각.
@@ -362,9 +440,13 @@ def _is_decoration(url: str) -> bool:
 # --------------------------------------------------------------------------
 
 
+#: 서식을 어떤 표현으로 옮길지.
+MARKDOWN, PLAIN, HTML = "markdown", "plain", "html"
+
+
 def _inline(node: Tag) -> str:
     """굵게·기울임·링크 정도만 살려서 한 줄 마크다운으로 만듭니다."""
-    return _clean(_walk(node, markup=True))
+    return _clean(_walk(node, MARKDOWN))
 
 
 def _plain(node: Tag) -> str:
@@ -373,12 +455,24 @@ def _plain(node: Tag) -> str:
     마크다운 결과에서 기호만 지우는 방식은 본문에 원래 있던 ``*`` 같은
     글자까지 건드리게 되므로, 변환 단계에서 아예 기호를 넣지 않습니다.
     """
-    return _clean(_walk(node, markup=False))
+    return _clean(_walk(node, PLAIN))
 
 
-def _walk(node, markup: bool) -> str:
+def _rich(node: Tag) -> str:
+    """같은 내용을 HTML 조각으로 냅니다.
+
+    마크다운을 HTML 로 되돌리는 대신 원본에서 바로 만듭니다.
+    되돌리는 방식은 본문에 원래 있던 ``*`` 나 ``#`` 같은 글자를
+    서식으로 오해하기 때문입니다.
+    """
+    body = _walk(node, HTML).strip()
+    # 문단 안의 줄바꿈은 HTML 에서 <br> 이어야 보입니다.
+    return re.sub(r"\n+", "<br>", body)
+
+
+def _walk(node, mode: str) -> str:
     if isinstance(node, NavigableString):
-        return str(node)
+        return escape(str(node)) if mode == HTML else str(node)
     if not isinstance(node, Tag):
         return ""
 
@@ -389,9 +483,11 @@ def _walk(node, markup: bool) -> str:
     if node.name == "img":
         return ""
 
-    inner = "".join(_walk(child, markup) for child in node.children)
-    if not markup:
+    inner = "".join(_walk(child, mode) for child in node.children)
+    if mode == PLAIN:
         return inner
+    if mode == HTML:
+        return _html_tag(node, inner)
 
     if node.name in ("b", "strong"):
         return _wrap(inner, "**")
@@ -407,6 +503,36 @@ def _walk(node, markup: bool) -> str:
         if href and href not in ("#", "javascript:void(0)") and label:
             return f"[{label}]({href})"
         return inner
+    return inner
+
+
+#: 살려둘 서식 태그. 나머지(span, font 등)는 내용만 남깁니다.
+_KEEP_TAGS = {
+    "b": "strong",
+    "strong": "strong",
+    "i": "em",
+    "em": "em",
+    "s": "del",
+    "strike": "del",
+    "del": "del",
+    "code": "code",
+    "sup": "sup",
+    "sub": "sub",
+}
+
+
+def _html_tag(node: Tag, inner: str) -> str:
+    """네이버가 붙인 스타일·클래스는 버리고 뜻이 있는 태그만 남깁니다."""
+    if node.name == "a":
+        href = (node.get("href") or "").strip()
+        if href and href not in ("#", "javascript:void(0)") and inner.strip():
+            safe = escape(href, quote=True)
+            return f'<a href="{safe}" rel="noopener">{inner}</a>'
+        return inner
+
+    tag = _KEEP_TAGS.get(node.name)
+    if tag and inner.strip():
+        return f"<{tag}>{inner}</{tag}>"
     return inner
 
 

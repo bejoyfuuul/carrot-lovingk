@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import mimetypes
 import re
+from html import escape
 from pathlib import Path
 
 import requests
@@ -55,15 +56,28 @@ def download_images(
         replacements[image.url] = relative
 
     if replacements:
-        post.markdown = _rewrite(post.markdown, replacements)
+        post.markdown = _rewrite_markdown(post.markdown, replacements)
+        post.html = _rewrite_html(post.html, replacements)
 
     return failed
 
 
-def _rewrite(markdown: str, replacements: dict[str, str]) -> str:
+def _rewrite_markdown(markdown: str, replacements: dict[str, str]) -> str:
     for original, local in replacements.items():
         markdown = markdown.replace(f"({original})", f"({local})")
     return markdown
+
+
+def _rewrite_html(html: str, replacements: dict[str, str]) -> str:
+    """HTML 안의 주소는 이스케이프된 형태로 들어 있어 따로 바꿔야 합니다.
+
+    본문에 ``&`` 가 든 주소는 ``&amp;`` 로 저장되어 있어서, 원래 주소만
+    찾아 바꾸면 사진이 그대로 네이버를 가리키게 됩니다.
+    """
+    for original, local in replacements.items():
+        html = html.replace(f'src="{escape(original, quote=True)}"', f'src="{local}"')
+        html = html.replace(f'src="{original}"', f'src="{local}"')
+    return html
 
 
 def _filename(url: str, index: int, data: bytes) -> str:

@@ -3,12 +3,21 @@
 네이버 블로그 글 주소를 주면 **본문을 통째로 가져와 파일로 저장**해 주는 도구입니다.
 글자만 긁어오는 게 아니라 제목, 소제목, 굵은 글씨, 인용문, 표, 사진까지 그대로 옮깁니다.
 
+주소 하나를 주면 이렇게 만들어집니다.
+
 ```
-https://blog.naver.com/아이디/223456789
-              ↓
-캐논 카메라 렌즈 시리얼 구분법.md   ← 노션·옵시디언에 바로 붙여넣기
-images/01_....jpg                  ← 본문 사진도 함께
+output/
+└─ 2013-07-24_캐논 카메라 렌즈 시리얼 구분법/
+   ├─ post.md      마크다운 - 노션·옵시디언에 바로 붙여넣기
+   ├─ post.html    브라우저로 열면 광고 없이 깔끔하게 읽힘
+   ├─ post.txt     글자만 - AI에게 통째로 넘길 때
+   ├─ post.json    프로그램 연동용
+   └─ images/      본문 사진 (문서 안 주소도 이 파일을 가리키게 자동 변경)
 ```
+
+폴더 이름은 **글 발행일 + 제목**입니다. 시간 순으로 정렬되고, 열어보지 않아도
+무슨 글인지 알 수 있습니다. 같은 글을 다시 받으면 같은 폴더에 갱신되어
+똑같은 글이 여러 개 쌓이지 않습니다.
 
 ## 왜 필요한가요
 
@@ -89,36 +98,29 @@ naver-blog
 주소> https://blog.naver.com/infotravelog/10172972504
 ```
 
-본문이 화면에 나오면 성공입니다. 축하합니다!
+다 받으면 지금 위치에 `output` 폴더가 생깁니다. 열어서 `post.html` 을
+더블클릭해 보세요. 브라우저에 글이 깔끔하게 뜨면 성공입니다. 축하합니다!
 
 ---
 
 # 실제로 쓰는 방법
 
-## 글 하나를 파일로 저장하기
+## 글 하나 받기
 
 ```bash
-naver-blog https://blog.naver.com/아이디/223456789 -o 내가받은글.md
+naver-blog https://blog.naver.com/아이디/223456789
 ```
 
-`-o` 는 **o**utput(저장할 파일)의 약자입니다.
+이게 전부입니다. `output/발행일_글제목/` 폴더에 **네 가지 형식과 사진이 모두**
+저장됩니다. 옵션을 하나도 몰라도 됩니다.
 
-## 파일 이름을 정하기 귀찮다면
+## 다른 폴더에 저장하기
 
 ```bash
-naver-blog https://blog.naver.com/아이디/223456789 -d 저장폴더
+naver-blog https://blog.naver.com/아이디/223456789 -d 내자료
 ```
 
-`-d` 는 **d**irectory(폴더)의 약자입니다. **글 제목 그대로** 파일 이름이 만들어집니다.
-
-## 사진까지 함께 받기
-
-```bash
-naver-blog https://blog.naver.com/아이디/223456789 -d 저장폴더 --images
-```
-
-`저장폴더/images/` 안에 사진이 저장되고, 문서 안의 사진 주소도 그 파일을
-가리키도록 자동으로 바뀝니다. **인터넷이 끊겨도, 원글이 지워져도** 사진이 보입니다.
+`output` 대신 `내자료` 폴더 아래에 저장됩니다. `-d` 는 **d**irectory(폴더)의 약자입니다.
 
 ## 여러 글을 한꺼번에 받기
 
@@ -134,22 +136,52 @@ https://blog.naver.com/아이디/333333333
 그리고 파일 이름을 그대로 넘기면 됩니다.
 
 ```bash
-naver-blog 주소목록.txt -d 저장폴더 --images
+naver-blog 주소목록.txt
 ```
 
 중간에 한 글이 실패해도 **나머지는 계속 받습니다.** 끝나고 몇 개가 실패했는지 알려줍니다.
 
-## 저장 형식 바꾸기
-
-| 명령 | 결과 | 이럴 때 쓰세요 |
-|---|---|---|
-| (기본값) | 마크다운 `.md` | 노션·옵시디언에 붙여넣기, 나중에 다시 읽기 |
-| `-f text` | 순수 텍스트 `.txt` | 글자만 필요할 때, AI에게 통째로 넘길 때 |
-| `-f json` | `.json` | 다른 프로그램에서 자동으로 처리할 때 |
+## 저장하지 않고 화면으로만 보기
 
 ```bash
-naver-blog https://blog.naver.com/아이디/223456789 -f text
+naver-blog https://blog.naver.com/아이디/223456789 --print
 ```
+
+디스크에 아무것도 만들지 않습니다. 내용만 빠르게 확인할 때 쓰세요.
+
+## 형식 하나만 받기
+
+네 가지가 다 필요하지 않다면 하나만 고를 수 있습니다.
+
+```bash
+naver-blog https://blog.naver.com/아이디/223456789 -f markdown
+```
+
+| 형식 | 파일 | 이럴 때 쓰세요 |
+|---|---|---|
+| `markdown` | `post.md` | 노션·옵시디언에 붙여넣기, 나중에 다시 읽기 |
+| `html` | `post.html` | 브라우저로 바로 읽기. 광고·메뉴 없음 |
+| `text` | `post.txt` | 글자만 필요할 때, AI에게 통째로 넘길 때 |
+| `json` | `post.json` | 다른 프로그램에서 자동으로 처리할 때 |
+
+## 사진 없이 글만 받기
+
+```bash
+naver-blog https://blog.naver.com/아이디/223456789 --no-images
+```
+
+사진이 많은 글은 용량이 커질 수 있습니다. 글만 필요하면 이 옵션을 쓰세요.
+문서 안의 사진 주소는 네이버 주소로 남습니다.
+
+## 파일 하나로만 저장하기
+
+폴더를 만들지 않고 딱 한 파일만 원한다면:
+
+```bash
+naver-blog https://blog.naver.com/아이디/223456789 -o 내글.md
+```
+
+**확장자가 형식을 정합니다.** `내글.json` 이라고 하면 JSON 으로 저장됩니다.
 
 ## 옵션 한눈에 보기
 
@@ -159,10 +191,12 @@ naver-blog --help
 
 | 옵션 | 뜻 |
 |---|---|
-| `-o`, `--output` | 저장할 파일 이름 |
-| `-d`, `--out-dir` | 저장할 폴더 (파일 이름은 글 제목으로) |
-| `-f`, `--format` | `markdown`(기본) · `text` · `json` |
-| `--images` | 본문 사진도 내려받고 주소를 로컬 경로로 바꿈 |
+| (없음) | `output/` 에 네 형식 + 사진 모두 저장 |
+| `-d`, `--out-dir` | 저장할 폴더 (기본값 `output`) |
+| `-f`, `--format` | 이 형식 하나만 저장 (`markdown`·`html`·`text`·`json`) |
+| `-p`, `--print` | 저장하지 않고 화면에 출력 |
+| `--no-images` | 사진을 받지 않음 |
+| `-o`, `--output` | 폴더 대신 이 파일 하나로 저장 |
 | `-v`, `--version` | 버전 확인 |
 
 ---
@@ -245,33 +279,63 @@ print(post.category)       # 분류
 print(post.tags)           # ['여행', '사진']
 print(post.markdown)       # 서식이 살아 있는 본문
 print(post.text)           # 서식 없는 본문
+print(post.html)           # 본문 HTML 조각
 for image in post.images:
     print(image.url)
 ```
 
-파일로 바로 저장하려면:
+## 폴더로 저장하기
+
+CLI 와 똑같은 구조로 저장합니다.
+
+```python
+from naver_blog_crawler import crawl_to_folder
+
+folder = crawl_to_folder(
+    "https://blog.naver.com/아이디/223456789",
+    out_dir="output",       # 기본값
+    with_images=True,       # 기본값
+)
+print(folder)   # output/2013-07-24_캐논 카메라 렌즈 시리얼 구분법
+```
+
+형식을 골라서 받을 수도 있습니다.
+
+```python
+crawl_to_folder(url, formats=["markdown", "json"])
+```
+
+## 파일 하나로 저장하기
 
 ```python
 from naver_blog_crawler import crawl_to_file
 
-path = crawl_to_file(
-    "https://blog.naver.com/아이디/223456789",
-    out_dir="결과",
-    fmt="markdown",     # "text" 또는 "json" 도 됩니다
-    with_images=True,
-)
-print(path)   # 결과/캐논 카메라 렌즈 시리얼 구분법.md
+path = crawl_to_file(url, "내글.md", fmt="markdown", with_images=True)
 ```
 
-여러 글을 받을 땐 연결을 재사용하면 훨씬 빠릅니다.
+## 이미 가져온 글을 저장하기
+
+한 번 가져온 글을 여러 번 저장하거나, 저장 전에 손보고 싶을 때 씁니다.
+
+```python
+from naver_blog_crawler import crawl, save_post
+
+post = crawl(url)
+post.title = post.title.replace("[공지] ", "")
+save_post(post, out_dir="정리한자료")
+```
+
+## 여러 글 받기
+
+연결을 재사용하면 훨씬 빠릅니다.
 
 ```python
 import requests
-from naver_blog_crawler import crawl
+from naver_blog_crawler import crawl_to_folder
 
 with requests.Session() as session:
     for url in urls:
-        post = crawl(url, session=session)
+        crawl_to_folder(url, session=session)
 ```
 
 ## 오류 다루기
@@ -309,8 +373,8 @@ except NaverBlogError as error:
 | `urls.py` | 여러 형태의 링크를 하나의 표준 주소로 정리 |
 | `fetch.py` | HTTP 요청, 재시도, 단축 링크 펼치기 |
 | `parse.py` | HTML → `Post`. 에디터 두 세대를 모두 처리 |
-| `render.py` | `Post` → 마크다운 / 텍스트 / JSON |
-| `images.py` | 사진 저장 및 본문 주소 치환 |
+| `render.py` | `Post` → 마크다운 / HTML / 텍스트 / JSON, 폴더 이름 규칙 |
+| `images.py` | 사진 저장 및 마크다운·HTML 안의 주소 치환 |
 | `cli.py` | 명령줄 진입점 |
 | `errors.py` | 한국어 안내가 붙은 예외들 |
 
@@ -326,6 +390,12 @@ except NaverBlogError as error:
 - **네이버 이미지 서버는 크기 지정 없이 원본을 주지 않습니다.** HTML 에 적힌
   '원본' 주소도 그대로 요청하면 404 입니다. 허용되는 최대 크기인
   `?type=w966` 을 붙여야 하고, 그보다 큰 값은 다시 404 가 됩니다.
+- **본문은 세 표현을 한자리에서 함께 만듭니다.** 마크다운만 만들어 두고
+  나중에 HTML 로 변환하면, 본문에 원래 있던 `*` 나 `#` 같은 글자를 서식으로
+  오해합니다. 원본 구조를 아는 `parse.py` 안에서 마크다운·텍스트·HTML 을
+  동시에 만드는 이유입니다.
+- **폴더 이름에 콜론을 쓰지 않습니다.** 윈도우에서 금지 문자이고,
+  맥 Finder 는 콜론을 `/` 로 보여줍니다. 시각이 필요하면 `19-30-45` 형태로 씁니다.
 - **브라우저를 쓰지 않습니다.** Selenium 이나 Playwright 없이 순수 HTTP 로
   동작합니다. 비개발자에게 브라우저 설치는 큰 장벽이기 때문입니다.
 

@@ -41,6 +41,8 @@ class Post:
     markdown: str = ""
     #: 서식을 모두 걷어낸 본문.
     text: str = ""
+    #: 본문만 담은 HTML 조각. 문서 전체는 render.to_html 이 만듭니다.
+    html: str = ""
     images: list[Image] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,5 +57,6 @@ class Post:
             "tags": self.tags,
             "markdown": self.markdown,
             "text": self.text,
+            "html": self.html,
             "images": [i.to_dict() for i in self.images],
         }

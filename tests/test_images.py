@@ -67,3 +67,37 @@ def test_사진이_없으면_폴더를_만들지_않는다(tmp_path):
     post = Post(url="u", blog_id="b", log_no="1", markdown="글만 있음")
     assert images_module.download_images(post, tmp_path) == []
     assert not (tmp_path / "images").exists()
+
+
+def test_HTML의_사진_주소도_함께_바뀐다(tmp_path, monkeypatch):
+    # 마크다운만 바꾸면 post.html 은 계속 네이버를 가리켜서,
+    # 인터넷이 끊기거나 원글이 지워지면 사진이 사라집니다.
+    monkeypatch.setattr(images_module, "download", lambda url, session=None: PNG)
+    post = _post()
+    post.html = (
+        '<figure><img src="https://img.example/a.png?type=w966" alt=""></figure>'
+        '<figure><img src="https://img.example/b.png?type=w966" alt=""></figure>'
+    )
+
+    images_module.download_images(post, tmp_path)
+
+    assert "https://img.example" not in post.html
+    assert post.html.count('src="images/') == 2
+
+
+def test_주소에_앰퍼샌드가_있어도_HTML에서_바뀐다(tmp_path, monkeypatch):
+    # HTML 안에서는 & 가 &amp; 로 저장되어 있습니다.
+    monkeypatch.setattr(images_module, "download", lambda url, session=None: PNG)
+    url = "https://img.example/a.png?type=w966&x=1"
+    post = Post(
+        url="u",
+        blog_id="b",
+        log_no="1",
+        markdown=f"![]({url})",
+        html=f'<figure><img src="https://img.example/a.png?type=w966&amp;x=1" alt=""></figure>',
+        images=[Image(url=url)],
+    )
+
+    images_module.download_images(post, tmp_path)
+
+    assert "img.example" not in post.html

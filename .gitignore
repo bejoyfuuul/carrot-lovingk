@@ -9,5 +9,5 @@ build/
 .DS_Store
 
 # 크롤링 결과물
-/결과/
 /output/
+/결과/

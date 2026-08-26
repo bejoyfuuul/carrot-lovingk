@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "naver-blog-crawler"
-version = "0.1.0"
+version = "0.2.0"
 description = "네이버 블로그 글을 마크다운·텍스트·JSON 으로 가져오는 도구"
 readme = "README.md"
 requires-python = ">=3.9"
